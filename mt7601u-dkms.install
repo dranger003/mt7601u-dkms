@@ -1,0 +1,51 @@
+post_install (){
+    MODULE="mt7601u"
+    VERSION="v3.0.0.4"
+    DKMS=$(which dkms)
+    MODPROBE=$(which modprobe)
+
+    SRC_DIR=/usr/src/$MODULE-$VERSION
+    FIRMWARE_DIR="/etc/Wireless/RT2870STA"
+
+    $DKMS add -m $MODULE -v $VERSION
+    $DKMS build -m $MODULE -v $VERSION
+    $DKMS install -m $MODULE -v $VERSION
+
+    mkdir -p $FIRMWARE_DIR
+    cp $SRC_DIR/RT2870STA.dat $FIRMWARE_DIR
+
+    $MODPROBE -a mt7601Usta
+}
+
+pre_upgrade(){
+    pre_remove
+}
+
+post_upgrade(){
+    post_install
+}
+
+pre_remove (){
+    _inmemory=$(/usr/bin/lsmod | /usr/bin/grep mt7601Usta)
+    if [ ! -z "$_inmemory" ]; then
+        /usr/bin/rmmod mt7601Usta &> /dev/null
+    fi
+
+    DKMS=$(which dkms)
+
+    _line=$($DKMS status -m mt7601Usta)
+    if echo "$_line" | grep -E 'added|built|installed'; then
+        version=$(echo "$_line" | sed 's/mt7601Usta,\([^,]*\)[,:].*/\1/;t;d')
+        $DKMS remove -m mt7601Usta -v $version --all
+    fi
+
+    rm -fr /etc/Wireless
+}
+
+post_remove () {
+    /sbin/depmod -a
+}
+
+op=$1
+shift
+$op $*
